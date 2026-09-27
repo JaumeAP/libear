@@ -49,6 +49,12 @@ target_include_directories(ear
 )
 
 target_link_libraries(ear PUBLIC Boost::boost ${CMAKE_DL_LIBS})
+
+if(EAR_USE_VDSP)
+  target_sources(ear PRIVATE fft_vdsp.cpp)
+  target_compile_definitions(ear PUBLIC EAR_HAS_VDSP)
+  target_link_libraries(ear PRIVATE "-framework Accelerate")
+endif()
 target_include_directories(ear PRIVATE $<TARGET_PROPERTY:xsimd,INTERFACE_INCLUDE_DIRECTORIES>)
 # Only use include directory of Eigen3 target
 # as otherwise Eigen3 needs to be installed and found when linking to a
