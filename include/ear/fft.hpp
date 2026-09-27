@@ -66,4 +66,12 @@ namespace ear {
   template <typename Real>
   FFTImpl<Real> &get_fft_kiss();
 
+#ifdef EAR_HAS_VDSP
+  /// Get an FFT implementation using Apple's Accelerate/vDSP framework. Only
+  /// available when libear is built with EAR_USE_VDSP (macOS), and only for
+  /// float. Sizes vDSP cannot handle fall back to the KISS implementation.
+  template <typename Real>
+  FFTImpl<Real> &get_fft_vdsp();
+#endif
+
 }  // namespace ear
