@@ -37,6 +37,8 @@ endif()
 add_ear_test("block_convolver_tests")
 target_sources("block_convolver_tests" PRIVATE "block_convolver_test_utils.cpp")
 
+add_ear_test("gain_interpolator_matrix_tests")
+
 if(EAR_USE_VDSP)
   add_ear_test("fft_vdsp_tests")
 
