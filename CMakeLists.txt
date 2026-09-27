@@ -40,7 +40,13 @@ option(EAR_USE_INTERNAL_EIGEN "should we use our own version of Eigen, or find o
 option(EAR_USE_INTERNAL_XSIMD "should we use our own version of xsimd, or find one with find_package?" TRUE)
 option(EAR_SIMD "try to use SIMD extensions" TRUE)
 if(APPLE)
-  option(EAR_USE_VDSP "provide an FFT implementation using Apple's Accelerate/vDSP" TRUE)
+  # Defaults to OFF, opt-in: merely linking the Accelerate framework into
+  # the ear library measurably changes the floating-point rounding of
+  # unrelated KissFFT computations elsewhere in the same process (observed
+  # as a hitherto-exact-zero sample becoming ~3e-8 in bear's
+  # variable_block_size test), even when get_fft_vdsp() is never called.
+  # Consumers that want the vDSP FFT should force this ON explicitly.
+  option(EAR_USE_VDSP "provide an FFT implementation using Apple's Accelerate/vDSP" FALSE)
 else()
   set(EAR_USE_VDSP FALSE)
 endif()
