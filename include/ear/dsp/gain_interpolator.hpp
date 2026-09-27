@@ -4,6 +4,10 @@
 #include <utility>
 #include <vector>
 
+#ifdef EAR_HAS_VDSP
+#include <Accelerate/Accelerate.h>
+#endif
+
 #include "../helpers/assert.hpp"
 
 namespace ear {
@@ -247,15 +251,51 @@ namespace ear {
     /// Points contain one vector of per-output gains per input channel.
     struct LinearInterpMatrix
         : public InterpType<std::vector<std::vector<float>>> {
+#ifdef EAR_HAS_VDSP
+      // Scratch buffer for the per-(in,out) gain ramp, reused across calls to
+      // avoid a heap allocation on every block. Not thread-safe, matching the
+      // rest of this header (called from a single rendering thread).
+      static std::vector<float> &ramp_scratch(size_t n) {
+        static thread_local std::vector<float> buf;
+        if (buf.size() < n) buf.resize(n);
+        return buf;
+      }
+#endif
+
       static void apply_interp(const float *const *in, float *const *out,
                                SampleIndex range_start, SampleIndex range_end,
                                SampleIndex block_start, SampleIndex start,
                                SampleIndex end, const Point &start_point,
                                const Point &end_point) {
         float scale = 1.0f / (end - start);
-        for (size_t out_channel = 0;
-             out_channel < (start_point.size() ? start_point[0].size() : 0);
-             out_channel++) {
+        size_t n_out = start_point.size() ? start_point[0].size() : 0;
+#ifdef EAR_HAS_VDSP
+        vDSP_Length n = (vDSP_Length)(range_end - range_start);
+        for (size_t out_channel = 0; out_channel < n_out; out_channel++)
+          vDSP_vclr(out[out_channel] + range_start, 1, n);
+
+        for (size_t in_channel = 0; in_channel < start_point.size();
+             in_channel++) {
+          for (size_t out_channel = 0;
+               out_channel < start_point[in_channel].size(); out_channel++) {
+            float s = start_point[in_channel][out_channel];
+            float e = end_point[in_channel][out_channel];
+
+            // gain(i) for i = range_start..range_end-1 is a linear ramp:
+            // gain0 at i = range_start, stepping by dgain per sample.
+            float p0 = (float)((block_start + range_start) - start) * scale;
+            float gain0 = (1.0f - p0) * s + p0 * e;
+            float dgain = (e - s) * scale;
+
+            std::vector<float> &ramp = ramp_scratch(n);
+            vDSP_vramp(&gain0, &dgain, ramp.data(), 1, n);
+            vDSP_vma(in[in_channel] + range_start, 1, ramp.data(), 1,
+                     out[out_channel] + range_start, 1,
+                     out[out_channel] + range_start, 1, n);
+          }
+        }
+#else
+        for (size_t out_channel = 0; out_channel < n_out; out_channel++) {
           for (SampleIndex i = range_start; i < range_end; i++) {
             out[out_channel][i] = 0.0;
           }
@@ -275,14 +315,29 @@ namespace ear {
             }
           }
         }
+#endif
       }
 
       static void apply_constant(const float *const *in, float *const *out,
                                  SampleIndex range_start, SampleIndex range_end,
                                  const Point &point) {
-        for (size_t out_channel = 0;
-             out_channel < (point.size() ? point[0].size() : 0);
-             out_channel++) {
+        size_t n_out = point.size() ? point[0].size() : 0;
+#ifdef EAR_HAS_VDSP
+        vDSP_Length n = (vDSP_Length)(range_end - range_start);
+        for (size_t out_channel = 0; out_channel < n_out; out_channel++)
+          vDSP_vclr(out[out_channel] + range_start, 1, n);
+
+        for (size_t in_channel = 0; in_channel < point.size(); in_channel++) {
+          for (size_t out_channel = 0; out_channel < point[in_channel].size();
+               out_channel++) {
+            float gain = point[in_channel][out_channel];
+            vDSP_vsma(in[in_channel] + range_start, 1, &gain,
+                      out[out_channel] + range_start, 1,
+                      out[out_channel] + range_start, 1, n);
+          }
+        }
+#else
+        for (size_t out_channel = 0; out_channel < n_out; out_channel++) {
           for (SampleIndex i = range_start; i < range_end; i++) {
             out[out_channel][i] = 0.0;
           }
@@ -296,6 +351,7 @@ namespace ear {
             }
           }
         }
+#endif
       }
     };
   }  // namespace dsp
