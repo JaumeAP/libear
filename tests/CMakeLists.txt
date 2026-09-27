@@ -36,6 +36,24 @@ endif()
 
 add_ear_test("block_convolver_tests")
 target_sources("block_convolver_tests" PRIVATE "block_convolver_test_utils.cpp")
+
+if(EAR_USE_VDSP)
+  add_ear_test("fft_vdsp_tests")
+
+  # same block convolver tests, run with the vDSP FFT implementation
+  add_executable(block_convolver_vdsp_tests block_convolver_tests.cpp block_convolver_test_utils.cpp)
+  target_link_libraries(block_convolver_vdsp_tests PRIVATE ear catch2 Eigen3::Eigen)
+  target_include_directories(block_convolver_vdsp_tests PRIVATE
+    ${PROJECT_SOURCE_DIR}/submodules
+    ${PROJECT_SOURCE_DIR}/src
+  )
+  target_compile_definitions(block_convolver_vdsp_tests PRIVATE BLOCK_CONVOLVER_TEST_VDSP)
+  add_test(
+    NAME block_convolver_vdsp_tests
+    COMMAND $<TARGET_FILE:block_convolver_vdsp_tests>
+    WORKING_DIRECTORY "${PROJECT_BINARY_DIR}/src"
+  )
+endif()
 add_ear_test("bs2051_tests")
 add_ear_test("conversion_tests")
 add_ear_test("delay_buffer_tests")

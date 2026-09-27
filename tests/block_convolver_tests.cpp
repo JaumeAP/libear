@@ -12,7 +12,11 @@
 using namespace ear;
 using namespace ear::dsp::block_convolver;
 
+#ifdef BLOCK_CONVOLVER_TEST_VDSP
+FFTImpl<float> &fft = get_fft_vdsp<float>();
+#else
 FFTImpl<float> &fft = get_fft_kiss<float>();
+#endif
 
 /// A test of the block convolver.
 ///
